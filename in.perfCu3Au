@@ -1,0 +1,114 @@
+# --------------------- INITIALIZAITION ---------------------
+clear
+units		metal
+dimension	3
+boundary	f   f   p  
+atom_style	 atomic
+variable latparam1 equal   3.615000 
+variable xunit  equal  ${latparam1}*sqrt(2)/2 
+variable yunit  equal  ${latparam1}*sqrt(2)/2 
+variable zunit  equal  ${latparam1}
+
+# --------------------- ATOM DEFINITION ---------------------
+read_data  ./Perf.txt    
+# --------------------- FORCE FIELDS ---------------------
+pair_style  eam/alloy 
+pair_coeff  * *  ./CuAg.eam.alloy.txt  Cu   Ag    
+neighbor    1.0     bin 
+neigh_modify    every   1  delay 5  check yes 
+delete_atoms    overlap 0.3   all  all 
+# --------------------- SETTINGS ---------------------
+timestep     0.01                            
+
+compute  peratom   all  pe/atom
+compute  eatoms    all  reduce   sum    c_peratom
+compute  mystress  all  stress/atom   NULL 
+
+compute     p1      all     reduce sum c_mystress[1]
+compute     p2      all     reduce sum c_mystress[2]
+compute     p3      all     reduce sum c_mystress[3]
+compute     p4      all     reduce sum c_mystress[4]
+compute     p5      all     reduce sum c_mystress[5]
+compute     p6      all     reduce sum c_mystress[6]
+
+variable    S11     equal   (c_p1)/vol
+variable    S22     equal   (c_p2)/vol 
+variable    S33     equal   (c_p3)/vol 
+variable    S12     equal   (c_p4)/vol       ##xy
+variable    S13     equal   (c_p5)/vol      ##xz 
+variable    S23     equal   (c_p6)/vol   
+#------------------relaxation ---------------
+variable  Xlo   equal "xlo"
+variable  Xhi   equal "xhi" 
+variable  Ylo   equal  "ylo"
+variable  Yhi   equal  "yhi"
+
+variable  XBodyLow  equal (${Xlo}+4.5*${xunit})
+variable  XBodyHigh equal (${Xhi}-4.5*${xunit})
+variable  YBodyLow  equal (${Ylo}+2.5*${yunit})
+variable  YBodyHigh equal (${Yhi}) 
+
+variable  temp  equal  "lx" 
+variable  L0    equal  ${temp}
+
+region   Xleft   block   ${Xlo}  ${XBodyLow}   ${Ylo}  ${Yhi}  INF  INF  units box  
+region   Xright  block   ${XBodyHigh}  ${Xhi}  ${Ylo}  ${Yhi}  INF  INF  units box  
+region   Yleft   block   ${Xlo}  ${Xhi}  ${Ylo}  ${YBodyLow}   INF  INF  units box  
+region   Yright  block   ${Xlo}  ${Xhi}  ${YBodyHigh}  ${Yhi}  INF  INF  units box 
+
+region  outside  union  4  Xleft  Yleft  Xright  Yright   
+delete_atoms  region  outside  
+
+print  "x low is ${Xlo}" 
+print  "initial length ${L0} " 
+thermo 200 
+thermo_style  custom step xlo xhi ylo yhi pe c_eatoms lx ly  
+dump 2 all  cfg   1000   Perf_cfg/Nb*.cfg  mass type xs ys &
+zs c_mystress[1] c_mystress[2] c_mystress[3] c_mystress[4] c_mystress[5] c_mystress[6] c_peratom  id 
+dump_modify  2 pad 7 
+
+min_style cg
+minimize    1e-10 1e-10 100000 100000
+undump  2 
+#-------------------add strain --------------
+
+region   YTop    block    ${Xlo}   ${Xhi}    0    ${Yhi}   &
+INF   INF  units  box         
+
+variable  Ylow1    equal    5*${yunit}   
+region    Ybottom  block    ${Xlo}   ${Xhi}   ${Ylo}   ${Ylow1}  &
+INF   INF  units  box    
+group     gYbottom  region  Ybottom 
+
+variable  X1   equal  ${XBodyLow}+1 
+
+#delete_atoms region  Point1  
+thermo 10000 
+thermo_style custom step lx ly lz press pxx pyy pzz pe temp
+
+group      gYtop    region   YTop  
+variable   srate    equal    1e-6      
+
+fix   1    all    nvt    temp   300    300    100    
+#fix   2    gYbottom   deform    1      x    erate  -${srate}   remap  x  
+
+variable  strain  equal  "(lx - v_L0)/v_L0"
+variable p1 equal "v_strain"
+variable p2 equal "-pxx/10000"
+variable p3 equal "-pyy/10000"
+variable p4 equal "-pzz/10000"
+
+fix def1 all print 100  "${p1} ${p2} ${p3} ${p4}" &
+file Cu_Strain.txt screen no
+
+dump   3  all  cfg   1000   ./Perf_cfg/Nb*.cfg  mass  type  xs  ys &
+zs c_mystress[1] c_mystress[2] c_mystress[3] c_mystress[4] c_mystress[5] c_mystress[6] c_peratom  id 
+dump_modify  3 pad 7 
+
+run		10000000
+unfix   1 
+unfix   2 
+unfix   def1 
+######################################
+# SIMULATION DONE
+print "All done"

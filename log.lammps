@@ -1,0 +1,218 @@
+LAMMPS (10 Feb 2015)
+# --------------------- INITIALIZAITION ---------------------
+clear
+units		metal
+dimension	3
+boundary	f   f   p
+atom_style	 atomic
+variable latparam1 equal   3.63902984582228
+variable xunit  equal  ${latparam1}*sqrt(2)/2
+variable xunit  equal  3.63902984582228*sqrt(2)/2
+variable yunit  equal  ${latparam1}*sqrt(2)/2
+variable yunit  equal  3.63902984582228*sqrt(2)/2
+variable zunit  equal  ${latparam1}
+variable zunit  equal  3.63902984582228
+
+# --------------------- ATOM DEFINITION ---------------------
+read_data  ./Edge.txt
+  triclinic box = (-5 -5 0) to (209.739 107.369 14.4772) with tilt (0 0 0)
+  2 by 2 by 1 MPI processor grid
+  reading atoms ...
+  26720 atoms
+# --------------------- FORCE FIELDS ---------------------
+pair_style  eam/alloy
+pair_coeff  *  *  ./CuAg.eam.alloy.txt  Cu  Ag
+neighbor    1.0     bin
+neigh_modify    every   1  delay 5  check yes
+delete_atoms    overlap 0.3   all  all
+Neighbor list info ...
+  2 neighbor list requests
+  update every 1 steps, delay 5 steps, check yes
+  master list distance cutoff = 6.99501
+Deleted 1760 atoms, new total = 24960
+# --------------------- SETTINGS ---------------------
+timestep     0.01
+
+compute  peratom   all  pe/atom
+compute  eatoms    all  reduce   sum    c_peratom
+compute  mystress  all  stress/atom   NULL
+
+compute     p1      all     reduce sum c_mystress[1]
+compute     p2      all     reduce sum c_mystress[2]
+compute     p3      all     reduce sum c_mystress[3]
+compute     p4      all     reduce sum c_mystress[4]
+compute     p5      all     reduce sum c_mystress[5]
+compute     p6      all     reduce sum c_mystress[6]
+
+variable    S11     equal   (c_p1)/vol
+variable    S22     equal   (c_p2)/vol
+variable    S33     equal   (c_p3)/vol
+variable    S12     equal   (c_p4)/vol       ##xy
+variable    S13     equal   (c_p5)/vol      ##xz
+variable    S23     equal   (c_p6)/vol
+#------------------relaxation ---------------
+variable  Xlo   equal  "xlo"
+variable  Xhi   equal  "xhi"
+variable  Ylo   equal  "ylo"
+variable  Yhi   equal  "yhi"
+
+variable  XBodyLow  equal (${Xlo}+2.5${xunit})
+variable  XBodyLow  equal (-5+2.5${xunit})
+variable  XBodyLow  equal (-5+2.52.57318268092117)
+variable  XBodyHigh equal (${Xhi}-2.5${xunit})
+variable  XBodyHigh equal (209.738526-2.5${xunit})
+variable  XBodyHigh equal (209.738526-2.52.57318268092117)
+variable  YBodyLow  equal (${Ylo}+3.5*${yunit})
+variable  YBodyLow  equal (-5+3.5*${yunit})
+variable  YBodyLow  equal (-5+3.5*2.57318268092117)
+variable  YBodyHigh equal (${Yhi})
+variable  YBodyHigh equal (107.369263)
+variable  YBodyInterFace equal (${Ylo}+5.5${yunit})
+variable  YBodyInterFace equal (-5+5.5${yunit})
+variable  YBodyInterFace equal (-5+5.52.57318268092117)
+
+variable  temp  equal  "lx"
+variable  L0    equal  ${temp}
+variable  L0    equal  214.738526
+
+region   Xleft   block   ${Xlo}  ${XBodyLow}   ${Ylo}  ${Yhi}  INF  INF  units box
+region   Xleft   block   -5  ${XBodyLow}   ${Ylo}  ${Yhi}  INF  INF  units box
+region   Xleft   block   -5  -2.48   ${Ylo}  ${Yhi}  INF  INF  units box
+region   Xleft   block   -5  -2.48   -5  ${Yhi}  INF  INF  units box
+region   Xleft   block   -5  -2.48   -5  107.369263  INF  INF  units box
+region   Xright  block   ${XBodyHigh}  ${Xhi}  ${Ylo}  ${Yhi} INF  INF  units box
+region   Xright  block   207.218526  ${Xhi}  ${Ylo}  ${Yhi} INF  INF  units box
+region   Xright  block   207.218526  209.738526  ${Ylo}  ${Yhi} INF  INF  units box
+region   Xright  block   207.218526  209.738526  -5  ${Yhi} INF  INF  units box
+region   Xright  block   207.218526  209.738526  -5  107.369263 INF  INF  units box
+region   Yleft   block   ${Xlo}  ${Xhi}  ${Ylo}  ${YBodyLow}  INF  INF  units box
+region   Yleft   block   -5  ${Xhi}  ${Ylo}  ${YBodyLow}  INF  INF  units box
+region   Yleft   block   -5  209.738526  ${Ylo}  ${YBodyLow}  INF  INF  units box
+region   Yleft   block   -5  209.738526  -5  ${YBodyLow}  INF  INF  units box
+region   Yleft   block   -5  209.738526  -5  4.0061393832241  INF  INF  units box
+region   Yright  block   ${Xlo}  ${Xhi}  ${YBodyHigh}  ${Yhi} INF  INF  units box
+region   Yright  block   -5  ${Xhi}  ${YBodyHigh}  ${Yhi} INF  INF  units box
+region   Yright  block   -5  209.738526  ${YBodyHigh}  ${Yhi} INF  INF  units box
+region   Yright  block   -5  209.738526  107.369263  ${Yhi} INF  INF  units box
+region   Yright  block   -5  209.738526  107.369263  107.369263 INF  INF  units box
+region   10Perc  block   ${Xlo}  ${Xhi}  ${YBodyInterFace} ${Yhi} INF INF  units box
+region   10Perc  block   -5  ${Xhi}  ${YBodyInterFace} ${Yhi} INF INF  units box
+region   10Perc  block   -5  209.738526  ${YBodyInterFace} ${Yhi} INF INF  units box
+region   10Perc  block   -5  209.738526  0.52 ${Yhi} INF INF  units box
+region   10Perc  block   -5  209.738526  0.52 107.369263 INF INF  units box
+
+#set     region   10Perc  type/fraction  2  0.1  12445
+region  outside  union  4  Xleft  Yleft  Xright  Yright
+delete_atoms  region  outside
+Deleted 640 atoms, new total = 24320
+
+print  "x low is ${Xlo}"
+x low is -5
+print  "initial length ${L0} "
+initial length 214.738526 
+thermo 200
+thermo_style  custom step xlo xhi ylo yhi pe c_eatoms lx ly
+dump 2 all  cfg   1000   ./NoTensile_cfg_2layer/*.cfg  mass  type xs ys zs c_mystress[1] c_mystress[2] c_mystress[3] c_mystress[4] c_mystress[5] c_mystress[6] c_peratom  id
+dump_modify  2 pad 7
+
+min_style cg
+minimize    1e-10 1e-10 100000 100000
+WARNING: Resetting reneighboring criteria during minimization (../min.cpp:168)
+Neighbor list info ...
+  1 neighbor list requests
+  update every 1 steps, delay 0 steps, check yes
+  master list distance cutoff = 6.99501
+Memory usage per processor = 7.8246 Mbytes
+Step Xlo Xhi Ylo Yhi PotEng eatoms Lx Ly 
+       0           -5    209.73853           -5    107.36926   -84882.121   -84882.121    214.73853    112.36926 
+     200           -5    209.73853           -5    107.36926   -84998.097   -84998.097    214.73853    112.36926 
+     339           -5    209.73853           -5    107.36926   -84998.183   -84998.183    214.73853    112.36926 
+Loop time of 34.2741 on 4 procs for 339 steps with 24320 atoms
+
+Minimization stats:
+  Stopping criterion = energy tolerance
+  Energy initial, next-to-last, final = 
+        -84882.1214229     -84998.1829537     -84998.1829617
+  Force two-norm initial, final = 35.9153 0.00975832
+  Force max component initial, final = 4.97012 0.00215
+  Final line search alpha, max atom move = 1 0.00215
+  Iterations, force evaluations = 339 673
+
+Pair  time (%) = 29.3166 (85.5357)
+Neigh time (%) = 0.167092 (0.487515)
+Comm  time (%) = 3.20814 (9.36023)
+Outpt time (%) = 0.000126839 (0.000370071)
+Other time (%) = 1.58217 (4.61622)
+
+Nlocal:    6080 ave 6240 max 5904 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+Nghost:    7800.5 ave 8158 max 7481 min
+Histogram: 1 1 0 0 0 0 0 1 0 1
+Neighs:    390011 ave 401313 max 377713 min
+Histogram: 2 0 0 0 0 0 0 0 0 2
+
+Total # of neighbors = 1560045
+Ave neighs/atom = 64.1466
+Neighbor list builds = 5
+Dangerous builds = 0uundump  2
+#-------------------add strain --------------
+
+region   YTop    block    ${Xlo}   ${Xhi}    0    ${Yhi}   INF   INF  units  box
+region   YTop    block    -5   ${Xhi}    0    ${Yhi}   INF   INF  units  box
+region   YTop    block    -5   209.738526    0    ${Yhi}   INF   INF  units  box
+region   YTop    block    -5   209.738526    0    107.369263   INF   INF  units  box
+
+variable  Ylow1    equal    5*${yunit}
+variable  Ylow1    equal    5*2.57318268092117
+region    Ybottom  block    ${Xlo}   ${Xhi}   ${Ylo}   ${Ylow1}  INF   INF  units  box
+region    Ybottom  block    -5   ${Xhi}   ${Ylo}   ${Ylow1}  INF   INF  units  box
+region    Ybottom  block    -5   209.738526   ${Ylo}   ${Ylow1}  INF   INF  units  box
+region    Ybottom  block    -5   209.738526   -5   ${Ylow1}  INF   INF  units  box
+region    Ybottom  block    -5   209.738526   -5   12.8659134046059  INF   INF  units  box
+group     gYbottom  region  Ybottom
+2224 atoms in group gYbottom
+
+variable  X1   equal  ${XBodyLow}+1
+variable  X1   equal  -2.48+1
+#region   Point1   cylinder  z    1   ${YBodyLow}  ${X1}  INF  INF  units  box
+
+#delete_atoms region  Point1
+thermo 10000
+thermo_style custom step lx ly lz press pxx pyy pzz pe temp
+
+group      gYtop    region   YTop
+24320 atoms in group gYtop
+variable   srate    equal    1e-6
+
+fix   1    all    nvt    temp   300    300    100
+#fix   2    gYbottom   deform    1      x    erate  -${srate}   remap  x
+
+
+dump   3  all  cfg   1000   ./NoTensile_cfg_2layer/*.cfg  mass  type xs ys zs c_mystress[1] c_mystress[2] c_mystress[3] c_mystress[4] c_mystress[5] c_mystress[6] c_peratom  id
+dump_modify  3 pad 7
+
+run		10000000
+Neighbor list info ...
+  1 neighbor list requests
+  update every 1 steps, delay 5 steps, check yes
+  master list distance cutoff = 6.99501
+Memory usage per processor = 4.83071 Mbytes
+Step Lx Ly Lz Press Pxx Pyy Pzz PotEng Temp 
+     339    214.73853    112.36926      14.4772   -1030.9368   -12.026115    3.0655737   -3083.8498   -84998.183            0 
+   10000    214.73853    112.36926      14.4772    -1031.062   -10.608982    7.4848221   -3090.0619   -84998.185 0.00094641494 
+   20000    214.73853    112.36926      14.4772    -1037.187    2.2409908    -19.94191   -3093.8601   -84998.185  0.001294904 
+   30000    214.73853    112.36926      14.4772   -1049.9545   -18.024302   -23.929491   -3107.9097   -84998.185 0.0015824375 
+   40000    214.73853    112.36926      14.4772     -1036.04   -6.3927925   -7.5481785   -3094.1791   -84998.184 0.0016588109 
+   50000    214.73853    112.36926      14.4772   -1016.2101    10.152872    18.313732    -3077.097   -84998.184 0.0023222391 
+   60000    214.73853    112.36926      14.4772   -1024.7861   -14.559206    23.487524   -3083.2867   -84998.181 0.0022560908 
+   70000    214.73853    112.36926      14.4772   -1020.9574    24.552427   -4.9374847   -3082.4871    -84998.18 0.0027474081 
+   80000    214.73853    112.36926      14.4772   -1037.0454    -9.492812   -5.3083477   -3096.3351   -84998.179 0.0036148174 
+   90000    214.73853    112.36926      14.4772   -1024.5334    6.3605248    2.0364523   -3081.9971   -84998.176 0.0038925197 
+  100000    214.73853    112.36926      14.4772    -1006.548    29.440345    18.584732   -3067.6692   -84998.174  0.005064875 
+  110000    214.73853    112.36926      14.4772   -1029.2317   -17.817103    18.560669   -3088.4387   -84998.171 0.0060786174 
+  120000    214.73853    112.36926      14.4772     -1027.85    23.444221   -20.903978   -3086.0902   -84998.167 0.0075298226 
+  130000    214.73853    112.36926      14.4772   -1081.6477   -58.158799   -53.056494   -3133.7278    -84998.16  0.008417069 
+  140000    214.73853    112.36926      14.4772   -1064.5387   -15.989761   -57.930545   -3119.6957   -84998.156  0.011098852 
+  150000    214.73853    112.36926      14.4772   -996.97446    22.174833    48.729168   -3061.8274   -84998.151  0.014130948 
+  160000    214.73853    112.36926      14.4772    -1001.962   -21.870752    79.189316   -3063.2046   -84998.142  0.017262218 
+  170000    214.73853    112.36926      14.4772   -1015.2417 

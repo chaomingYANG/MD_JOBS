@@ -1,0 +1,224 @@
+# Input file for Stack Fault Energy surface of Nickel
+
+# --------------------- INITIALIZAITION ---------------------
+
+clear
+
+units		metal
+
+dimension	3
+
+boundary	p p p 
+
+atom_style	atomic
+
+variable    latparam1   equal 3.020000
+
+variable    x_displace  equal -0.1*(${latparam1}/sqrt(6))
+
+variable    xdim        equal ${latparam1}*sqrt(6)/2
+
+variable    ydim        equal ${latparam1}*sqrt(3)
+
+variable    zdim        equal ${latparam1}*sqrt(2)
+
+variable    zdimlow     equal ${latparam1}*sqrt(2)     
+
+variable    zdimhigh    equal ${latparam1}*sqrt(2)*2
+
+#variable    zdimtotal   equal  ${zdimhigh}
+
+#variable nloop equal 50 
+
+# --------------------- ATOM DEFINITION ---------------------
+
+read_data   ./lattice.txt
+
+variable    xlen    equal   lx
+
+variable    ylen    equal   ly
+
+variable    zlen    equal   lz
+
+
+
+print "lx: ${xlen}"
+
+print "ly: ${ylen}"
+
+print "lz: ${zlen}"
+
+# --------------------- FORCE FIELDS ---------------------
+
+pair_style  eam/alloy
+
+pair_coeff * *  ./W.eam.fs W 
+
+neighbor        2.0     bin
+
+neigh_modify    every   1     delay   10   check   yes
+
+# --------------------- SETTINGS ---------------------
+
+timestep     0.01     ##### 10e-15 
+
+#variable     runtimes loop 10 
+
+compute      peratom   all    pe/atom          
+
+compute      eatoms    all    reduce        sum   c_peratom
+
+compute      csym      all    centro/atom   bcc
+
+compute      mystress  all    stress/atom  NULL 
+
+
+
+compute     p1      all     reduce sum c_mystress[1]
+
+compute     p2      all     reduce sum c_mystress[2]
+
+compute     p3      all     reduce sum c_mystress[3]
+
+compute     p4      all     reduce sum c_mystress[4]
+
+compute     p5      all     reduce sum c_mystress[5]
+
+compute     p6      all     reduce sum c_mystress[6]
+
+
+
+variable         S11 equal (c_p1)/vol      ##xx
+
+variable         S22 equal (c_p2)/vol       
+
+variable         S33 equal (c_p3)/vol
+
+variable         S12 equal (c_p4)/vol       ##xy
+
+variable         S13 equal (c_p5)/vol       ##xz 
+
+variable         S23 equal (c_p6)/vol       ##yz 
+
+#----------------------------------------------------
+
+thermo   100 
+
+thermo_style  custom  step  pe  c_eatoms lx   ly   lz  v_S11 v_S22 v_S33 v_S12 v_S13 v_S23 
+
+dump    mydump  all  custom  10000    dump/dump.relax.1.* id type xs ys zs c_peratom c_csym 
+
+dump    dxyz    all  xyz   1000   xyz/gsf_bcc.xyz 
+
+dump    mycfg   all  cfg   1000   cfg/Mo_${x_displace}_*.cfg  mass  type xs ys zs c_csym c_peratom id type  c_mystress[1] c_mystress[2] c_mystress[3] c_mystress[4] c_mystress[5] c_mystress[6]
+
+restart  10000  restart/gsf_bcc.restart 
+
+#--------------------relax box -----------------------
+
+
+
+variable tmp equal "lx"
+
+variable L0 equal ${tmp}
+
+print  "L0 = ${L0}"
+
+variable E  equal "c_eatoms"
+
+#variable E equal "c_eatoms" computes the initial energy of the model before any sliding is done
+
+
+
+#label loop 
+
+#variable a loop  ${nloop}
+
+#variable movement  equal  ${x_displace}
+
+#displace_atoms top move ${movement}  0.0 0.0 units box
+
+
+
+#displace_atoms is the command neccessary to move atoms into the next stacking arrangement (ie: A -> B)
+
+reset_timestep   0         
+
+#relax at 1 K ########
+
+ 
+
+
+
+#fully relax at 0 K 
+
+fix 1 all box/relax  couple none  vmax 0.0001   #x 0.0 y 0.0 z 0.0 couple none 
+
+min_style   cg
+
+minimize    10e-30 10e-30  200000   200000 
+
+
+
+variable Ef equal "c_eatoms"
+
+variable Cf equal 1.60217657e-16
+
+variable A  equal (${xdim}*${ydim})*1e-20
+
+variable Sxx equal "v_S11/10000" 
+
+variable Syy equal "v_S22/10000" 
+
+variable Szz equal "v_S33/10000"
+
+variable Sxy equal "v_S12/10000"
+
+variable Sxz equal "v_S13/10000" 
+
+variable Syz equal "v_S23/10000" 
+
+variable length  equal "lx"
+
+variable lengthy equal "ly"
+
+#variable SFE equal ((${Ef}-${Eo})*${Cf})/${A}
+
+####################################
+
+# SIMULATION DONE
+
+print "All done"
+
+print "Final energy of atoms = ${Ef} eV"
+
+print "Lattice_constant = ${length}"
+
+print "Lattice_constanty = ${lengthy}"
+
+print "Sxx = ${Sxx} " 
+
+print "Syy = ${Syy} " 
+
+print "Szz = ${Szz} " 
+
+print "Syz = ${Syz} " 
+
+print "Sxz = ${Sxz} " 
+
+print "Sxy = ${Sxy} "
+
+#next a 
+
+#jump ./in.GSF_111_110_bcc loop 
+
+undump  mydump 
+
+undump  mycfg 
+
+undump  dxyz 
+
+#next runtimes 
+
+#jump ./in.shear_bcc_110 loop 
+
